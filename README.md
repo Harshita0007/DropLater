@@ -5,10 +5,10 @@ DropLater is a robust, open-source service for scheduling webhook deliveries. It
 Whether you're building a notification system, a deferred task runner, or a data synchronization pipeline, DropLater ensures your events are delivered reliably, precisely when they're needed.
 
 -----
-##  System Flow
+## 📌 System Flow
 
-Here’s the flow diagram explaining the DropLater process:  
-![Flow Diagram](https://drive.google.com/file/d/1o0WthVGq_P51713fLwagUJ-Oej_sEQX9/view?usp=sharing)
+You can view the system flow diagram here:  
+[🔗 View Flow Diagram](https://drive.google.com/file/d/1o0WthVGq_P51713fLwagUJ-Oej_sEQX9/view?usp=sharing)
 
 
 
