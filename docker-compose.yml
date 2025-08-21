@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: droplater-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: droplater
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - droplater-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: droplater-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - droplater-network
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: droplater-api
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - MONGODB_URI=mongodb://mongo:27017/droplater
+      - REDIS_URL=redis://redis:6379
+      - ADMIN_TOKEN=super-secret-admin-token-2024
+      - WEBHOOK_SINK_URL=http://sink:4000/sink
+    depends_on:
+      - mongo
+      - redis
+    volumes:
+      - ./api:/app
+      - /app/node_modules
+    networks:
+      - droplater-network
+    command: npm run dev
+
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: droplater-worker
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongo:27017/droplater
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mongo
+      - redis
+      - api
+    volumes:
+      - ./worker:/app
+      - /app/node_modules
+    networks:
+      - droplater-network
+    command: npm run dev
+
+  sink:
+    build:
+      context: ./sink
+      dockerfile: Dockerfile
+    container_name: droplater-sink
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    volumes:
+      - ./sink:/app
+      - /app/node_modules
+    networks:
+      - droplater-network
+    command: npm run dev
+
+volumes:
+  mongo_data:
+  redis_data:
+
+networks:
+  droplater-network:
+    driver: bridge

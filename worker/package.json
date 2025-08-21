@@ -1,0 +1,40 @@
+{
+  "name": "droplater-worker",
+  "version": "1.0.0",
+  "description": "DropLater Worker service for processing scheduled deliveries",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "start": "node index.js",
+    "test": "echo 'Worker tests run from API package'",
+    "lint": "echo 'Linting worker code...' && node -c index.js",
+    "format": "echo 'Code formatting would run here (consider adding prettier)'",
+    "seed": "echo 'Worker does not seed data - run from API package'"
+  },
+  "dependencies": {
+    "bullmq": "^4.15.0",
+    "ioredis": "^5.3.0",
+    "mongoose": "^8.0.0",
+    "axios": "^1.6.0",
+    "pino": "^8.16.0",
+    "pino-pretty": "^10.2.0",
+    "dayjs": "^1.11.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "worker",
+    "queue",
+    "webhook",
+    "delivery",
+    "bullmq",
+    "redis"
+  ],
+  "author": "DropLater Team",
+  "license": "MIT"
+}

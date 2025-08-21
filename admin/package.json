@@ -1,0 +1,40 @@
+{
+  "name": "droplater-admin",
+  "version": "1.0.0",
+  "description": "DropLater Admin UI - React interface for managing scheduled webhook deliveries",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "vite preview --port 3001",
+    "test": "echo 'Admin UI tests would go here'",
+    "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
+    "format": "prettier --write src/**/*.{js,jsx,ts,tsx,css,md}"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "framer-motion": "^10.16.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.1.0",
+    "vite": "^5.0.0",
+    "eslint": "^8.53.0",
+    "prettier": "^3.1.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "react",
+    "admin",
+    "ui",
+    "webhook",
+    "scheduling"
+  ],
+  "author": "DropLater Team",
+  "license": "MIT"
+}
