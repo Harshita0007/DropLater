@@ -33,13 +33,11 @@ async function runAllTests() {
   let totalFailed = 0;
   
   try {
-    // Run unit tests
     console.log('1. Unit Tests');
     console.log('-------------');
     await runCommand('node', ['tests/unit/idempotencyKey.test.js'], rootDir);
     console.log('Unit tests completed!\n');
     
-    // Check if services are running for integration tests
     console.log('2. Integration Tests');
     console.log('--------------------');
     console.log('Note: Integration tests require running services');
