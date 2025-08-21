@@ -19,7 +19,6 @@ const logger = pino({
   }
 });
 
-// Note model (copied from API)
 const noteSchema = new mongoose.Schema({
   title: { type: String, required: true },
   body: { type: String, required: true },
@@ -40,20 +39,14 @@ const noteSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const Note = mongoose.model('Note', noteSchema);
-
-// Redis connection
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
   retryDelayOnFailover: 100,
   maxRetriesPerRequest: 3
 });
-
-// Generate idempotency key
 const generateIdempotencyKey = (noteId, releaseAt) => {
   const data = `${noteId}:${releaseAt}`;
   return crypto.createHash('sha256').update(data).digest('hex');
 };
-
-// Delivery function
 const deliverNote = async (job) => {
   const { noteId } = job.data;
   const startTime = Date.now();
@@ -71,11 +64,8 @@ const deliverNote = async (job) => {
       return;
     }
     
-    // Generate idempotency key
     const idempotencyKey = generateIdempotencyKey(noteId, note.releaseAt.toISOString());
-    
-    // Prepare payload
-    const payload = {
+        const payload = {
       id: noteId,
       title: note.title,
       body: note.body,
@@ -89,11 +79,10 @@ const deliverNote = async (job) => {
       'X-Idempotency-Key': idempotencyKey
     };
     
-    // Make HTTP request
     const response = await axios.post(note.webhookUrl, payload, {
       headers,
-      timeout: 30000, // 30 second timeout
-      validateStatus: (status) => status < 500 // Don't throw on 4xx errors
+      timeout: 30000, 
+      validateStatus: (status) => status < 500 
     });
     
     const duration = Date.now() - startTime;
@@ -104,11 +93,9 @@ const deliverNote = async (job) => {
       error: response.status >= 400 ? `HTTP ${response.status}` : undefined
     };
     
-    // Update note with attempt
     note.attempts.push(attempt);
     
     if (attempt.ok) {
-      // Success - mark as delivered
       note.status = 'delivered';
       note.deliveredAt = new Date();
       await note.save();
@@ -120,7 +107,6 @@ const deliverNote = async (job) => {
         attempt: job.attemptsMade + 1
       }, 'Note delivered successfully');
     } else {
-      // HTTP error - will retry or fail
       note.status = 'failed';
       await note.save();
       
@@ -138,7 +124,6 @@ const deliverNote = async (job) => {
   } catch (error) {
     const duration = Date.now() - startTime;
     
-    // Record attempt
     try {
       const note = await Note.findById(noteId);
       if (note) {
@@ -151,7 +136,6 @@ const deliverNote = async (job) => {
         
         note.attempts.push(attempt);
         
-        // Check if this is the final attempt
         if (job.attemptsMade + 1 >= 3) {
           note.status = 'dead';
           logger.error({
@@ -177,11 +161,11 @@ const deliverNote = async (job) => {
       error: error.message
     }, 'Delivery attempt failed');
     
-    throw error; // Re-throw to trigger retry
+    throw error; 
   }
 };
 
-// Create worker
+
 const worker = new Worker('delivery', deliverNote, {
   connection: redis,
   concurrency: 5,
@@ -190,7 +174,6 @@ const worker = new Worker('delivery', deliverNote, {
   }
 });
 
-// Worker event handlers
 worker.on('completed', (job) => {
   logger.info({ jobId: job.id, noteId: job.data.noteId }, 'Job completed successfully');
 });
@@ -208,7 +191,6 @@ worker.on('error', (err) => {
   logger.error({ error: err.message }, 'Worker error');
 });
 
-// Polling mechanism for due notes (alternative approach)
 const pollForDueNotes = async () => {
   try {
     const now = new Date();
@@ -220,7 +202,6 @@ const pollForDueNotes = async () => {
     if (dueNotes.length > 0) {
       logger.info({ count: dueNotes.length }, 'Found due notes via polling');
       
-      // Add jobs for due notes
       const jobs = dueNotes.map(note => ({
         name: 'deliver-note',
         data: { noteId: note._id.toString() },
@@ -241,10 +222,8 @@ const pollForDueNotes = async () => {
   }
 };
 
-// Start polling every 5 seconds
 const pollInterval = setInterval(pollForDueNotes, 5000);
 
-// Connect to MongoDB
 async function startWorker() {
   try {
     await mongoose.connect(process.env.MONGODB_URI, {
@@ -260,7 +239,6 @@ async function startWorker() {
   }
 }
 
-// Graceful shutdown
 process.on('SIGINT', async () => {
   logger.info('Shutting down worker gracefully...');
   clearInterval(pollInterval);
