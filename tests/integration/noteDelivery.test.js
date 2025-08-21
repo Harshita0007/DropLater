@@ -1,8 +1,6 @@
-// tests/integration/noteDelivery.test.js
 const http = require('http');
 const crypto = require('crypto');
 
-// Mock HTTP server to capture webhook calls
 class MockSinkServer {
   constructor() {
     this.receivedWebhooks = [];
@@ -57,7 +55,6 @@ class MockSinkServer {
   }
 }
 
-// API Client for testing
 class APIClient {
   constructor(baseUrl = 'http://localhost:3000', token = 'super-secret-admin-token-2024') {
     this.baseUrl = baseUrl;
@@ -105,7 +102,6 @@ class APIClient {
   }
 }
 
-// Test runner
 async function runIntegrationTests() {
   console.log('Running Integration Tests - Note Delivery Flow\n');
   
@@ -151,7 +147,6 @@ async function runIntegrationTests() {
     }
   }
   
-  // Helper to wait for delivery
   function waitForDelivery(timeoutMs = 10000) {
     return new Promise((resolve, reject) => {
       const startTime = Date.now();
@@ -168,21 +163,18 @@ async function runIntegrationTests() {
   }
 
   try {
-    // Start mock sink server
     await mockSink.start();
     console.log(`Mock sink server started on port ${mockSink.port}`);
     
-    // Test 1: API health check
     await test('API health check returns OK', async () => {
       const response = await apiClient.healthCheck();
       expect(response.ok).toBe(true);
     });
     
-    // Test 2: Create note with past releaseAt triggers immediate delivery
     await test('Create note with past releaseAt triggers delivery within 10 seconds', async () => {
       mockSink.reset();
       
-      const pastDate = new Date(Date.now() - 5000).toISOString(); // 5 seconds ago
+      const pastDate = new Date(Date.now() - 5000).toISOString(); 
       const noteData = {
         title: 'Integration Test Note',
         body: 'This note should be delivered immediately due to past releaseAt',
@@ -190,38 +182,34 @@ async function runIntegrationTests() {
         webhookUrl: mockSink.getWebhookUrl()
       };
       
-      // Create the note
+    
       const createResponse = await apiClient.createNote(noteData);
       expect(createResponse).toHaveProperty('id');
       
-      // Wait for delivery
+    
       const webhook = await waitForDelivery();
       
-      // Verify webhook received
+      
       expect(webhook.body.title).toBe(noteData.title);
       expect(webhook.body.body).toBe(noteData.body);
       expect(webhook.headers['x-note-id']).toBe(createResponse.id);
       expect(webhook.headers['x-idempotency-key']).toHaveProperty('length');
     });
     
-    // Test 3: Idempotency key format validation
+    
     await test('Webhook contains valid idempotency key', async () => {
       const lastWebhook = mockSink.receivedWebhooks[mockSink.receivedWebhooks.length - 1];
       const idempotencyKey = lastWebhook.headers['x-idempotency-key'];
       
-      // Should be 64 character hex string (SHA256)
+      
       expect(idempotencyKey.length).toBe(64);
       expect(/^[a-f0-9]{64}$/.test(idempotencyKey)).toBe(true);
     });
     
-    // Test 4: Verify delivery updates note status
     await test('Note status updates to delivered after successful delivery', async () => {
-      // Small delay to allow worker to update database
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
       const notes = await apiClient.getNotes({ status: 'delivered' });
       expect(notes.notes.length).toBeGreaterThan(0);
-      
       const deliveredNote = notes.notes.find(n => n.title === 'Integration Test Note');
       expect(deliveredNote.status).toBe('delivered');
       expect(deliveredNote.deliveredAt).toHaveProperty('length');
@@ -230,11 +218,9 @@ async function runIntegrationTests() {
       expect(deliveredNote.attempts[0].statusCode).toBe(200);
     });
     
-    // Test 5: Duplicate delivery prevention (idempotency)
     await test('Duplicate deliveries are prevented by idempotency', async () => {
       const initialWebhookCount = mockSink.receivedWebhooks.length;
       
-      // Create another note with same data (different ID but should not cause duplicate processing)
       const noteData = {
         title: 'Idempotency Test Note',
         body: 'Testing idempotency behavior',
@@ -245,15 +231,13 @@ async function runIntegrationTests() {
       await apiClient.createNote(noteData);
       await waitForDelivery();
       
-      // Should have received exactly one more webhook
       expect(mockSink.receivedWebhooks.length).toBe(initialWebhookCount + 1);
     });
     
-    // Test 6: Future delivery scheduling
     await test('Notes with future releaseAt are not delivered immediately', async () => {
       mockSink.reset();
       
-      const futureDate = new Date(Date.now() + 60000).toISOString(); // 1 minute in future
+      const futureDate = new Date(Date.now() + 60000).toISOString(); 
       const noteData = {
         title: 'Future Test Note',
         body: 'This note should not be delivered yet',
@@ -263,11 +247,9 @@ async function runIntegrationTests() {
       
       await apiClient.createNote(noteData);
       
-      // Wait 3 seconds - should not receive webhook
       await new Promise(resolve => setTimeout(resolve, 3000));
       expect(mockSink.receivedWebhooks.length).toBe(0);
       
-      // Verify note is still pending
       const notes = await apiClient.getNotes({ status: 'pending' });
       const pendingNote = notes.notes.find(n => n.title === 'Future Test Note');
       expect(pendingNote.status).toBe('pending');
@@ -278,7 +260,6 @@ async function runIntegrationTests() {
     console.log('Mock sink server stopped');
   }
   
-  // Summary
   console.log(`\nTest Results:`);
   console.log(`   Passed: ${passed}`);
   console.log(`   Failed: ${failed}`);
@@ -293,9 +274,7 @@ async function runIntegrationTests() {
   }
 }
 
-// Run tests if this file is executed directly
 if (require.main === module) {
-  // Check if fetch is available (Node 18+)
   if (typeof fetch === 'undefined') {
     console.error('Integration tests require Node.js 18+ with native fetch support');
     console.error('Or install node-fetch: npm install node-fetch');
