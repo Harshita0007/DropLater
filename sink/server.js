@@ -15,19 +15,15 @@ const logger = pino({
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Redis connection for idempotency
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
   retryDelayOnFailover: 100,
   maxRetriesPerRequest: 3
 });
 
-// Body parsing
 app.use(express.json({ limit: '10mb' }));
 
-// Environment variable to simulate failures
 const shouldFail = process.env.SINK_SIMULATE_FAILURE === 'true';
 
-// POST /sink - Accept webhook deliveries
 app.post('/sink', async (req, res) => {
   const idempotencyKey = req.headers['x-idempotency-key'];
   const noteId = req.headers['x-note-id'];
@@ -46,7 +42,6 @@ app.post('/sink', async (req, res) => {
     });
   }
   
-  // Simulate failure if environment variable is set
   if (shouldFail) {
     logger.error({ noteId, idempotencyKey }, 'Simulating failure');
     return res.status(500).json({
@@ -55,12 +50,10 @@ app.post('/sink', async (req, res) => {
   }
   
   try {
-    // Check idempotency using Redis SETNX
     const key = `idempotency:${idempotencyKey}`;
     const wasSet = await redis.setnx(key, '1');
     
     if (!wasSet) {
-      // Already processed - return success without doing anything
       logger.info({ noteId, idempotencyKey }, 'Duplicate request - already processed');
       return res.status(200).json({
         message: 'Already processed',
@@ -68,10 +61,8 @@ app.post('/sink', async (req, res) => {
       });
     }
     
-    // Set expiration (1 day)
     await redis.expire(key, 86400);
     
-    // Log the received webhook (this simulates processing)
     logger.info({
       noteId,
       idempotencyKey,
@@ -80,7 +71,6 @@ app.post('/sink', async (req, res) => {
       body: req.body.body ? `${req.body.body.substring(0, 50)}...` : undefined
     }, 'Webhook received and processed');
     
-    // Return success
     res.status(200).json({
       message: 'Webhook processed successfully',
       noteId,
@@ -100,12 +90,10 @@ app.post('/sink', async (req, res) => {
   }
 });
 
-// Health check
 app.get('/health', (req, res) => {
   res.json({ ok: true, service: 'sink' });
 });
 
-// Toggle failure simulation endpoint (for testing)
 app.post('/toggle-failure', (req, res) => {
   process.env.SINK_SIMULATE_FAILURE = process.env.SINK_SIMULATE_FAILURE === 'true' ? 'false' : 'true';
   logger.info({ simulateFailure: process.env.SINK_SIMULATE_FAILURE }, 'Toggled failure simulation');
@@ -115,13 +103,11 @@ app.post('/toggle-failure', (req, res) => {
   });
 });
 
-// Error handling
 app.use((err, req, res, next) => {
   logger.error({ error: err.message }, 'Unhandled error');
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
 });
@@ -145,7 +131,6 @@ async function startSink() {
   }
 }
 
-// Graceful shutdown
 process.on('SIGINT', async () => {
   logger.info('Shutting down sink gracefully...');
   await redis.quit();
