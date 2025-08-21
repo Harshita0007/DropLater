@@ -1,4 +1,3 @@
-// api/middleware/auth.js - CORRECT IMPLEMENTATION
 const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
   
@@ -9,7 +8,7 @@ const authMiddleware = (req, res, next) => {
     });
   }
   
-  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+  const token = authHeader.substring(7); 
   const expectedToken = process.env.ADMIN_TOKEN;
   
   if (!expectedToken) {
@@ -30,5 +29,5 @@ const authMiddleware = (req, res, next) => {
   next();
 };
 
-// EXPORT AS FUNCTION - THIS IS CRITICAL
+
 module.exports = authMiddleware;

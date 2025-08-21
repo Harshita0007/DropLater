@@ -23,7 +23,7 @@ const noteSchema = new mongoose.Schema({
   releaseAt: {
     type: Date,
     required: true,
-    index: true // Index for finding due notes quickly
+    index: true 
   },
   webhookUrl: {
     type: String,
@@ -35,7 +35,7 @@ const noteSchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'delivered', 'failed', 'dead'],
     default: 'pending',
-    index: true // Index for listing by status
+    index: true 
   },
   attempts: {
     type: [attemptSchema],
@@ -57,7 +57,7 @@ const noteSchema = new mongoose.Schema({
   }
 });
 
-// Compound index for efficient querying
+
 noteSchema.index({ status: 1, releaseAt: 1 });
 
 module.exports = mongoose.model('Note', noteSchema);

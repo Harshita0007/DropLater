@@ -52,11 +52,9 @@ async function seed() {
     await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/droplater');
     console.log('Connected to MongoDB');
     
-    // Clear existing notes
     await Note.deleteMany({});
     console.log('Cleared existing notes');
     
-    // Insert sample notes
     const createdNotes = await Note.insertMany(sampleNotes);
     console.log(`Created ${createdNotes.length} sample notes:`);
     

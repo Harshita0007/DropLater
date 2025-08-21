@@ -1,4 +1,3 @@
-// api/routes/notes.js - All endpoints as specified in assignment
 const express = require('express');
 const { z } = require('zod');
 const dayjs = require('dayjs');
@@ -11,11 +10,10 @@ dayjs.extend(utc);
 
 const router = express.Router();
 
-// Validation schemas as per assignment requirements
 const createNoteSchema = z.object({
   title: z.string().min(1).max(200).trim(),
   body: z.string().min(1).max(5000).trim(),
-  releaseAt: z.string().datetime(), // ISO string format
+  releaseAt: z.string().datetime(), 
   webhookUrl: z.string().url().refine(url => url.startsWith('http://') || url.startsWith('https://'), {
     message: 'Webhook URL must start with http:// or https://'
   })
@@ -28,7 +26,6 @@ const listNotesSchema = z.object({
   }).optional().default('1')
 });
 
-// Initialize delivery queue
 let deliveryQueue;
 const initQueue = async () => {
   if (!deliveryQueue) {
@@ -44,11 +41,10 @@ const initQueue = async () => {
   return deliveryQueue;
 };
 
-// POST /api/notes - Create note
-// Validates payload (title, body, releaseAt, webhookUrl) and returns created id
+
 router.post('/', async (req, res) => {
   try {
-    // Validate payload as specified in assignment
+
     const validatedData = createNoteSchema.parse(req.body);
     
     const note = new Note({
@@ -62,15 +58,15 @@ router.post('/', async (req, res) => {
     
     await note.save();
     
-    // Initialize queue
+    
     await initQueue();
     
-    // Calculate delay for delivery
+    
     const now = dayjs.utc();
     const releaseTime = dayjs.utc(validatedData.releaseAt);
     const delayMs = Math.max(0, releaseTime.diff(now));
     
-    // Add job to queue with delay
+    
     await deliveryQueue.add('deliver-note', 
       { noteId: note._id.toString() },
       { 
@@ -86,9 +82,9 @@ router.post('/', async (req, res) => {
       }
     );
     
-    console.log(`✅ Note created: ${note._id} (delivery in ${delayMs}ms)`);
+    console.log(` Note created: ${note._id} (delivery in ${delayMs}ms)`);
     
-    // Return the created id as specified
+    
     res.status(201).json({ id: note._id });
     
   } catch (error) {
@@ -107,11 +103,11 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/notes?status=&page= - List notes (paginated 20 per page)
+
 router.get('/', async (req, res) => {
   try {
     const { status, page } = listNotesSchema.parse(req.query);
-    const pageSize = 20; // As specified in assignment
+    const pageSize = 20; 
     const skip = (parseInt(page) - 1) * pageSize;
     
     const filter = {};
@@ -164,12 +160,12 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/notes/:id/replay - Requeue a note that failed or is dead
+
 router.post('/:id/replay', async (req, res) => {
   try {
     const noteId = req.params.id;
     
-    // Validate MongoDB ObjectId format
+   
     if (!/^[0-9a-fA-F]{24}$/.test(noteId)) {
       return res.status(400).json({
         error: 'Invalid note ID format',
@@ -185,7 +181,6 @@ router.post('/:id/replay', async (req, res) => {
       });
     }
     
-    // Only allow replay of failed or dead notes (as per assignment)
     if (note.status === 'delivered') {
       return res.status(400).json({
         error: 'Cannot replay delivered note',
@@ -200,14 +195,11 @@ router.post('/:id/replay', async (req, res) => {
       });
     }
     
-    // Reset note status to pending for replay
     note.status = 'pending';
     await note.save();
     
-    // Initialize queue
     await initQueue();
     
-    // Add job to queue immediately (no delay for replays)
     await deliveryQueue.add('deliver-note', 
       { noteId: noteId },
       { 
