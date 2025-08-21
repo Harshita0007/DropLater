@@ -25,14 +25,8 @@ Whether you're building a notification system, a deferred task runner, or a data
 
 ### Running with Docker Compose
 
-1.  **Clone the repository and navigate to the project directory:**
 
-    ```bash
-    git clone <your-repo-url>
-    cd DropLater
-    ```
-
-2.  **Set up your environment:**
+1.  **Set up your environment:**
 
     ```bash
     cp .env.example .env
@@ -40,7 +34,7 @@ Whether you're building a notification system, a deferred task runner, or a data
 
     For security, remember to set a strong `ADMIN_TOKEN`.
 
-3.  **Start all services:**
+2.  **Start all services:**
 
     ```bash
     docker compose up
