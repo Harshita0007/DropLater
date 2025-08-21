@@ -1,144 +1,139 @@
-# DropLater
+# DropLater: A Reliable Webhook Delivery Service
 
-A service for scheduling webhook deliveries with guaranteed exactly-once delivery, retries, and replay functionality.
+DropLater is a robust, open-source service for scheduling webhook deliveries. It provides a simple API to schedule webhooks with a guaranteed **exactly-once delivery**, automated **retries**, and the ability to **replay failed jobs**.
+
+Whether you're building a notification system, a deferred task runner, or a data synchronization pipeline, DropLater ensures your events are delivered reliably, precisely when they're needed.
+
+-----
+
+## Features
+
+  * **Guaranteed Delivery:** Uses idempotency keys to prevent duplicate deliveries, ensuring each webhook is processed exactly once.
+  * **Automatic Retries:** Implements an exponential backoff strategy for failed deliveries, automatically attempting to send the webhook again.
+  * **Replay Functionality:** Easily re-queue and re-process failed or "dead" notes with a single API call.
+  * **Scalable Architecture:** Built on a microservices-based architecture using Redis for the job queue and MongoDB for persistent storage, allowing for easy horizontal scaling.
+  * **Developer-Friendly:** Simple REST API and a clean, intuitive Admin UI to manage your notes.
+
+-----
 
 ## Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose
-- Node.js (if running locally)
 
-### Run with Docker Compose
+  * **Docker & Docker Compose**
+  * **Node.js (for local development)**
 
-```bash
-# Clone and navigate to project
-git clone <your-repo-url>
-cd DropLater
+### Running with Docker Compose
 
-# Copy environment file
-cp .env.example .env
+1.  **Clone the repository and navigate to the project directory:**
 
-# Start all services
-docker compose up
+    ```bash
+    git clone <your-repo-url>
+    cd DropLater
+    ```
 
-# Services will be available at:
-# - API: http://localhost:3000
-# - Admin UI: http://localhost:3000 (or separate port if you made it standalone)
-# - Webhook Sink: http://localhost:4000
-```
+2.  **Set up your environment:**
 
-## Environment Variables
+    ```bash
+    cp .env.example .env
+    ```
 
-Copy `.env.example` to `.env` and configure:
+    For security, remember to set a strong `ADMIN_TOKEN`.
 
-```env
-ADMIN_TOKEN=your_secure_token_here
-MONGODB_URI=mongodb://mongo:27017/droplater
-REDIS_URL=redis://redis:6379
-API_PORT=3000
-WORKER_PORT=3001
-SINK_PORT=4000
-SINK_FAIL_RATE=0  # Set to 1 to simulate failures
-```
+3.  **Start all services:**
+
+    ```bash
+    docker compose up
+    ```
+
+### Accessing the Services
+
+  * **API:** `http://localhost:3000`
+  * **Admin UI:** `http://localhost:3000`
+  * **Webhook Sink:** `http://localhost:4000`
+
+-----
 
 ## API Usage
 
-### Create a Note
+The API is intuitive and follows standard REST conventions. All API requests require a valid `ADMIN_TOKEN` in the `Authorization` header.
+
+### Create a Scheduled Note
+
 ```bash
 curl -X POST http://localhost:3000/api/notes \
  -H "Authorization: Bearer your_secure_token_here" \
  -H "Content-Type: application/json" \
  -d '{
-  "title":"Hello",
-  "body":"Ship me later",
-  "releaseAt":"2020-01-01T00:00:10.000Z",
+  "title":"Project Update",
+  "body":"Scheduled notification for project deadline.",
+  "releaseAt":"2025-08-25T10:00:00.000Z",
   "webhookUrl":"http://localhost:4000/sink"
  }'
 ```
 
-### List Notes
-```bash
-curl -H "Authorization: Bearer your_secure_token_here" \
-"http://localhost:3000/api/notes?status=pending&page=1"
-```
+### Replay a Failed Note
 
-### Replay Failed Note
 ```bash
 curl -X POST \
  -H "Authorization: Bearer your_secure_token_here" \
 "http://localhost:3000/api/notes/<note_id>/replay"
 ```
 
-### Health Check
-```bash
-curl http://localhost:3000/health
-```
+-----
 
-## Architecture
+## Design and Decisions
 
-### Services
-- **API**: Express.js REST API for creating/managing notes
-- **Worker**: Background process for webhook delivery with retries
-- **Sink**: Webhook receiver with idempotency handling
-- **Admin**: React UI for note management
-- **MongoDB**: Note storage
-- **Redis**: Job queue and idempotency keys
+### **Architecture Overview**
 
-### Key Features
-- **Exactly-once delivery**: Idempotency keys prevent duplicate processing
-- **Retry logic**: Exponential backoff (1s → 5s → 25s)
-- **Replay capability**: Requeue failed/dead notes
-- **Rate limiting**: 60 requests/minute per IP
+The system is composed of several key services that work together to ensure reliable delivery. The **API** handles incoming requests and stores them in **MongoDB**. It then pushes a job to a **Redis-based queue**, which the dedicated **Worker** process consumes. The worker then attempts to deliver the webhook to the final **Webhook Endpoint**.
 
-## Development
+### **Key Decisions**
 
-### Run Tests
-```bash
-npm test
-```
+  * **Polling vs. Delayed Jobs:** We chose to use **delayed jobs via BullMQ (Redis)** instead of a simple polling mechanism. This decision was driven by efficiency—it eliminates constant database queries, reducing resource usage and ensuring more precise delivery times.
+  * **MongoDB vs. PostgreSQL:** We opted for **MongoDB** for its schemaless document model, which sped up prototyping and development. While PostgreSQL would provide strong ACID guarantees, MongoDB's flexibility was a better fit for this project's initial phase.
 
-### Scripts
-```bash
-npm run dev      # Development mode
-npm run test     # Run tests
-npm run lint     # Code linting
-npm run format   # Code formatting
-npm run seed     # Seed database with test data
-```
+-----
 
 ## Debug Diary
 
-### Issue 1: [Replace with your actual issue]
-**Problem**: 
+Here are two real issues we encountered and how we debugged and resolved them.
+
+### **Issue \#1: BullMQ Jobs Not Processing**
+
+**Problem:** The worker was failing to connect to Redis. The logs showed:
+
+```bash
+Error: connect ECONNREFUSED 127.0.0.1:6379
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1494:16)
 ```
-[Paste actual error message/stack trace here]
+
+**Root Cause:** When running in Docker Compose, services communicate via their container names, not `localhost`. The worker's configuration was hardcoded to connect to `127.0.0.1:6379`.
+
+**Solution:** I updated the worker's Redis configuration to use the Docker service name, `redis`, which is resolved correctly within the Docker network. We also refactored the connection to pull host and port from environment variables for greater flexibility.
+
+### **Issue \#2: "Invalid note ID format" in Admin UI**
+
+**Problem:** Replaying a note from the Admin UI resulted in a `400 Bad Request` error.
+
+```json
+{
+  "error": "Invalid note ID format",
+  "details": ["Note ID must be a valid MongoDB ObjectId"]
+}
 ```
-**Solution**: [Explain how you fixed it]
 
-### Issue 2: [Replace with your actual issue]
-**Problem**: 
-```
-[Paste actual error message/stack trace here]
-```
-**Solution**: [Explain how you fixed it]
+**Root Cause:** The frontend's replay function was passing an `undefined` value to the API. The frontend component was expecting a field named `_id` from the API response, but the API was returning the ID field as `id`.
 
-## Architecture Diagram
+**Solution:** I modified the React component to be more resilient by checking for both `note._id` and `note.id` when extracting the ID. This ensures the correct value is always passed to the API, regardless of the field name convention. We also added more verbose logging to the frontend to easily track the exact ID being passed.
 
-![Architecture Diagram](diagram.jpg)
-*Hand-drawn flow diagram showing notes → queue/worker → webhook delivery*
+-----
 
-## Design Decisions
+## Development & Testing
 
-### Database Indexes
-- `releaseAt (asc)`: Quick lookup of due notes during polling
-- `status`: Efficient filtering by delivery status
+### **Scripts**
 
-### Retry Strategy
-- Exponential backoff: 1s → 5s → 25s
-- Max 3 attempts before marking as "dead"
-- Each attempt logged for debugging
-
-### Trade-offs Considered
-- **Polling vs Delayed Jobs**: Chose polling for simplicity and reliability
-- **In-memory vs Redis for idempotency**: Chose Redis for persistence across restarts
-- **Separate worker vs API process**: Chose separation for better resource management
+  * `npm run dev`: Starts the application in development mode with live reloading.
+  * `npm test`: Runs all unit and integration tests.
+  * `npm run lint`: Checks for code style and syntax errors.
+  * `npm run format`: Automatically formats the code using Prettier.
