@@ -48,94 +48,120 @@ function App() {
                 }
             });
             const data = await response.json();
+            console.log('Fetched notes:', data.notes); // Debug log
             setNotes(data.notes || []);
         } catch (err) {
+            console.error('Fetch error:', err);
             setError('Failed to fetch notes');
         } finally {
             setLoading(false);
         }
     };
 
-    const createNote = async (e) => {
+    const createNote = (e) => {
         e.preventDefault();
-        try {
-            setLoading(true);
-            setError('');
 
-            // Prepare the data with properly formatted date
-            const submitData = {
-                ...formData,
-                releaseAt: formatDateForAPI(formData.releaseAt)
-            };
+        const submitData = {
+            ...formData,
+            releaseAt: formatDateForAPI(formData.releaseAt)
+        };
 
-            console.log('Submitting data:', submitData); // Debug log
+        console.log('Submitting data:', submitData); // Debug log
 
-            const response = await fetch(`${API_BASE}/notes`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${ADMIN_TOKEN}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(submitData)
+        setLoading(true);
+        setError('');
+
+        fetch(`${API_BASE}/notes`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${ADMIN_TOKEN}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(submitData)
+        })
+            .then(response => response.json().then(data => ({ status: response.status, data })))
+            .then(({ status, data }) => {
+                if (status === 201) {
+                    setSuccess('Note created successfully!');
+                    setFormData({
+                        title: '',
+                        body: '',
+                        releaseAt: '',
+                        webhookUrl: 'http://sink:4000/sink'
+                    });
+                    setTimeout(() => setSuccess(''), 3000);
+                    fetchNotes();
+                } else {
+                    console.error('API Error:', data);
+                    setError(data.error || data.message || 'Failed to create note');
+                }
+            })
+            .catch(err => {
+                console.error('Network Error:', err);
+                setError('Network error: ' + err.message);
+            })
+            .finally(() => {
+                setLoading(false);
             });
-
-            if (response.ok) {
-                setSuccess('Note created successfully!');
-                setFormData({
-                    title: '',
-                    body: '',
-                    releaseAt: '',
-                    webhookUrl: 'http://sink:4000/sink'
-                });
-                setTimeout(() => setSuccess(''), 3000);
-                fetchNotes();
-            } else {
-                const errorData = await response.json();
-                console.error('API Error:', errorData); // Debug log
-                setError(errorData.error || errorData.message || 'Failed to create note');
-            }
-        } catch (err) {
-            console.error('Network Error:', err); // Debug log
-            setError('Network error: ' + err.message);
-        } finally {
-            setLoading(false);
-        }
     };
 
-    const replayNote = async (noteId) => {
-        try {
-            setLoading(true);
-            const response = await fetch(`${API_BASE}/notes/${noteId}/replay`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${ADMIN_TOKEN}`
-                }
-            });
+    const replayNote = (noteId) => {
+        console.log('Replaying note with ID:', noteId, typeof noteId); // Debug log
 
-            if (response.ok) {
-                setSuccess('Note replayed successfully!');
-                setTimeout(() => setSuccess(''), 3000);
+        setLoading(true);
+        setError(''); // Clear previous errors
 
-                // Animate the row
-                setAnimatingRows(prev => new Set([...prev, noteId]));
-                setTimeout(() => {
-                    setAnimatingRows(prev => {
-                        const newSet = new Set(prev);
-                        newSet.delete(noteId);
-                        return newSet;
-                    });
-                }, 1000);
-
-                fetchNotes();
-            } else {
-                const errorData = await response.json();
-                setError(errorData.error || 'Failed to replay note');
-            }
-        } catch (err) {
-            setError('Network error');
-        } finally {
+        // Ensure we have a valid note ID
+        if (!noteId) {
+            setError('Invalid note ID');
             setLoading(false);
+            return;
         }
+
+        // Use the actual note ID (should be _id or id from the note object)
+        const actualNoteId = noteId._id || noteId.id || noteId;
+        console.log('Using note ID:', actualNoteId);
+
+        fetch(`${API_BASE}/notes/${actualNoteId}/replay`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${ADMIN_TOKEN}`,
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json().then(data => ({ status: response.status, data })))
+            .then(({ status, data }) => {
+                console.log('Replay response:', status, data);
+
+                if (status === 200) {
+                    setSuccess('Note replayed successfully!');
+                    setTimeout(() => setSuccess(''), 3000);
+
+                    // Animate the row
+                    setAnimatingRows(prev => new Set([...prev, actualNoteId]));
+                    setTimeout(() => {
+                        setAnimatingRows(prev => {
+                            const newSet = new Set(prev);
+                            newSet.delete(actualNoteId);
+                            return newSet;
+                        });
+                    }, 1000);
+
+                    fetchNotes();
+                } else {
+                    console.error('Replay failed:', data);
+                    setError(data.error || data.message || 'Failed to replay note');
+                    setTimeout(() => setError(''), 5000);
+                }
+            })
+            .catch(err => {
+                console.error('Replay network error:', err);
+                setError('Network error during replay: ' + err.message);
+                setTimeout(() => setError(''), 5000);
+            })
+            .finally(() => {
+                setLoading(false);
+            });
     };
 
     useEffect(() => {
@@ -157,7 +183,12 @@ function App() {
     };
 
     const formatDate = (dateStr) => {
-        return new Date(dateStr).toLocaleString();
+        if (!dateStr) return 'N/A';
+        try {
+            return new Date(dateStr).toLocaleString();
+        } catch (e) {
+            return 'Invalid Date';
+        }
     };
 
     return (
@@ -198,7 +229,7 @@ function App() {
             }}>
                 <h2 style={{ margin: '0 0 20px 0', color: '#374151' }}>Create New Note</h2>
 
-                <form onSubmit={createNote}>
+                <div>
                     <div style={{ marginBottom: '15px' }}>
                         <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
                             Title
@@ -249,11 +280,10 @@ function App() {
                                 border: '1px solid #d1d5db',
                                 borderRadius: '4px'
                             }}
-                            min={new Date().toISOString().slice(0, 16)} // Prevent past dates
                             required
                         />
                         <small style={{ color: '#6b7280', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                            Select a future date and time for when the note should be delivered
+                            Select a future date and time (or past date for immediate testing)
                         </small>
                     </div>
 
@@ -280,7 +310,7 @@ function App() {
                     </div>
 
                     <button
-                        type="submit"
+                        onClick={createNote}
                         disabled={loading}
                         style={{
                             backgroundColor: '#3b82f6',
@@ -294,7 +324,7 @@ function App() {
                     >
                         {loading ? 'Creating...' : 'Create Note'}
                     </button>
-                </form>
+                </div>
             </div>
 
             {/* Notes Table */}
@@ -303,20 +333,20 @@ function App() {
                     <h2 style={{ margin: 0, color: '#374151' }}>Notes</h2>
                     <button
                         onClick={fetchNotes}
+                        disabled={loading}
                         style={{
                             backgroundColor: '#6b7280',
                             color: 'white',
                             padding: '8px 16px',
                             border: 'none',
                             borderRadius: '4px',
-                            cursor: 'pointer'
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                            opacity: loading ? 0.6 : 1
                         }}
                     >
-                        Refresh
+                        {loading ? 'Loading...' : 'Refresh'}
                     </button>
                 </div>
-
-                {loading && <p>Loading...</p>}
 
                 <div style={{ overflowX: 'auto' }}>
                     <table style={{
@@ -348,63 +378,67 @@ function App() {
                             </tr>
                         </thead>
                         <tbody>
-                            {notes.map(note => (
-                                <tr
-                                    key={note._id}
-                                    style={{
-                                        borderBottom: '1px solid #e5e7eb',
-                                        backgroundColor: animatingRows.has(note._id) ? '#dbeafe' : 'white',
-                                        transition: 'background-color 1s ease'
-                                    }}
-                                >
-                                    <td style={{ padding: '12px', fontSize: '12px', fontFamily: 'monospace' }}>
-                                        {note._id?.slice(-8) || 'N/A'}
-                                    </td>
-                                    <td style={{ padding: '12px' }}>
-                                        {note.title}
-                                    </td>
-                                    <td style={{ padding: '12px' }}>
-                                        <span style={{
-                                            padding: '4px 8px',
-                                            borderRadius: '12px',
-                                            fontSize: '12px',
-                                            fontWeight: 'bold',
-                                            backgroundColor: getStatusColor(note.status) + '20',
-                                            color: getStatusColor(note.status)
-                                        }}>
-                                            {note.status}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '12px' }}>
-                                        {note.attempts?.length > 0
-                                            ? note.attempts[note.attempts.length - 1].statusCode || 'N/A'
-                                            : 'N/A'
-                                        }
-                                    </td>
-                                    <td style={{ padding: '12px', fontSize: '12px' }}>
-                                        {formatDate(note.releaseAt)}
-                                    </td>
-                                    <td style={{ padding: '12px' }}>
-                                        {(note.status === 'failed' || note.status === 'dead') && (
-                                            <button
-                                                onClick={() => replayNote(note._id)}
-                                                disabled={loading}
-                                                style={{
-                                                    backgroundColor: '#10b981',
-                                                    color: 'white',
-                                                    padding: '6px 12px',
-                                                    border: 'none',
-                                                    borderRadius: '4px',
-                                                    cursor: loading ? 'not-allowed' : 'pointer',
-                                                    fontSize: '12px'
-                                                }}
-                                            >
-                                                Replay
-                                            </button>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
+                            {notes.map(note => {
+                                const noteId = note._id || note.id;
+                                return (
+                                    <tr
+                                        key={noteId}
+                                        style={{
+                                            borderBottom: '1px solid #e5e7eb',
+                                            backgroundColor: animatingRows.has(noteId) ? '#dbeafe' : 'white',
+                                            transition: 'background-color 1s ease'
+                                        }}
+                                    >
+                                        <td style={{ padding: '12px', fontSize: '12px', fontFamily: 'monospace' }}>
+                                            {noteId ? noteId.toString().slice(-8) : 'N/A'}
+                                        </td>
+                                        <td style={{ padding: '12px' }}>
+                                            {note.title || 'N/A'}
+                                        </td>
+                                        <td style={{ padding: '12px' }}>
+                                            <span style={{
+                                                padding: '4px 8px',
+                                                borderRadius: '12px',
+                                                fontSize: '12px',
+                                                fontWeight: 'bold',
+                                                backgroundColor: getStatusColor(note.status) + '20',
+                                                color: getStatusColor(note.status)
+                                            }}>
+                                                {note.status || 'unknown'}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '12px' }}>
+                                            {note.attempts?.length > 0
+                                                ? note.attempts[note.attempts.length - 1].statusCode || 'N/A'
+                                                : 'N/A'
+                                            }
+                                        </td>
+                                        <td style={{ padding: '12px', fontSize: '12px' }}>
+                                            {formatDate(note.releaseAt)}
+                                        </td>
+                                        <td style={{ padding: '12px' }}>
+                                            {(note.status === 'failed' || note.status === 'dead') && (
+                                                <button
+                                                    onClick={() => replayNote(noteId)}
+                                                    disabled={loading}
+                                                    style={{
+                                                        backgroundColor: '#10b981',
+                                                        color: 'white',
+                                                        padding: '6px 12px',
+                                                        border: 'none',
+                                                        borderRadius: '4px',
+                                                        cursor: loading ? 'not-allowed' : 'pointer',
+                                                        fontSize: '12px',
+                                                        opacity: loading ? 0.6 : 1
+                                                    }}
+                                                >
+                                                    Replay
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
