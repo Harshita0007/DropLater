@@ -10,7 +10,6 @@ function App() {
     const [success, setSuccess] = useState('');
     const [animatingRows, setAnimatingRows] = useState(new Set());
 
-    // Form state
     const [formData, setFormData] = useState({
         title: '',
         body: '',
@@ -18,11 +17,9 @@ function App() {
         webhookUrl: 'http://sink:4000/sink'
     });
 
-    // Helper function to format date for datetime-local input
     const formatDateForInput = (date) => {
         if (!date) return '';
         const d = new Date(date);
-        // Convert to local timezone and format for datetime-local
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
@@ -31,11 +28,8 @@ function App() {
         return `${year}-${month}-${day}T${hours}:${minutes}`;
     };
 
-    // Helper function to convert datetime-local value to ISO string
     const formatDateForAPI = (datetimeLocalValue) => {
         if (!datetimeLocalValue) return '';
-        // datetime-local gives us "YYYY-MM-DDTHH:mm"
-        // Convert to ISO string
         return new Date(datetimeLocalValue).toISOString();
     };
 
@@ -48,7 +42,7 @@ function App() {
                 }
             });
             const data = await response.json();
-            console.log('Fetched notes:', data.notes); // Debug log
+            console.log('Fetched notes:', data.notes); 
             setNotes(data.notes || []);
         } catch (err) {
             console.error('Fetch error:', err);
@@ -66,7 +60,7 @@ function App() {
             releaseAt: formatDateForAPI(formData.releaseAt)
         };
 
-        console.log('Submitting data:', submitData); // Debug log
+        console.log('Submitting data:', submitData); 
 
         setLoading(true);
         setError('');
@@ -106,19 +100,18 @@ function App() {
     };
 
     const replayNote = (noteId) => {
-        console.log('Replaying note with ID:', noteId, typeof noteId); // Debug log
+        console.log('Replaying note with ID:', noteId, typeof noteId); 
 
         setLoading(true);
-        setError(''); // Clear previous errors
+        setError(''); 
 
-        // Ensure we have a valid note ID
+       
         if (!noteId) {
             setError('Invalid note ID');
             setLoading(false);
             return;
         }
 
-        // Use the actual note ID (should be _id or id from the note object)
         const actualNoteId = noteId._id || noteId.id || noteId;
         console.log('Using note ID:', actualNoteId);
 
@@ -137,7 +130,6 @@ function App() {
                     setSuccess('Note replayed successfully!');
                     setTimeout(() => setSuccess(''), 3000);
 
-                    // Animate the row
                     setAnimatingRows(prev => new Set([...prev, actualNoteId]));
                     setTimeout(() => {
                         setAnimatingRows(prev => {
@@ -167,7 +159,6 @@ function App() {
     useEffect(() => {
         fetchNotes();
 
-        // Auto-refresh every 5 seconds
         const interval = setInterval(fetchNotes, 5000);
         return () => clearInterval(interval);
     }, []);
@@ -195,7 +186,6 @@ function App() {
         <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '1200px', margin: '0 auto' }}>
             <h1 style={{ margin: '0 0 30px 0', color: '#1f2937' }}>DropLater Admin</h1>
 
-            {/* Success/Error Messages */}
             {success && (
                 <div style={{
                     padding: '10px',
@@ -220,7 +210,6 @@ function App() {
                 </div>
             )}
 
-            {/* Create Note Form */}
             <div style={{
                 backgroundColor: '#f9fafb',
                 padding: '20px',
@@ -327,7 +316,7 @@ function App() {
                 </div>
             </div>
 
-            {/* Notes Table */}
+           
             <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <h2 style={{ margin: 0, color: '#374151' }}>Notes</h2>
